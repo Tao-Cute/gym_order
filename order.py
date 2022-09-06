@@ -1,6 +1,7 @@
 import requests
 import easyocr
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageEnhance
 from io import BytesIO
 import re
 from sys import exit as sys_exit
@@ -250,10 +251,17 @@ class Elife():
         读取验证码，如果错误则重新获取，直到成功识别出4个数字的验证码
         '''
         while True:  # 验证码识别为空或者不是4个字符，则重试
-            img_code = Image.open(BytesIO(self.session.get(self.url_code).content))
-            # img_code.show()
+            img_code = Image.open(BytesIO(self.session.get(self.url_code).content)).convert('L')
+            img_code.show()
+
+            enh_bri = ImageEnhance.Brightness(img_code)
+            img_code_enhanced = enh_bri.enhance(factor=1.5)
+            img_code_enhanced.show()
+
+            img_code_numpy = np.array(img_code_enhanced)
+
             reader = easyocr.Reader(['en'], gpu=False, verbose=False)
-            result = reader.readtext(img_code)
+            result = reader.readtext(img_code_numpy)
             if len(result) > 0 and len(result[0][1].replace(' ', '')) == 4:
                 break
             else:
