@@ -201,12 +201,18 @@ class Elife():
             'orderCounts': 1
         }
         page_order = self.session.get('https://elife.fudan.edu.cn/public/front/loadOrderForm_ordinary.htm', params=params)  # 获取预定页面
-        page_order_html = etree.HTML(page_order.text)
-        order_user = page_order_html.xpath('//*[@id="order_user"]/@value')[0]  # 用户名
-        # 要发送的信息
-        court_name = page_order_html.xpath('//*[@class="ddqr"]/text()')[0][6:]  # 场地名称
-        order_date = page_order_html.xpath('//*[@class="txdd_table_2"]/tr[3]/td/p/text()')[0]  # 日期 星期几
-        order_time = page_order_html.xpath('//*[@class="txdd_table_2"]/tr[3]/td/p/span/text()')[0].replace('\r\n', '').replace('\t', '')  # 时间段
+        try:
+            page_order_html = etree.HTML(page_order.text)
+            order_user = page_order_html.xpath('//*[@id="order_user"]/@value')[0]  # 用户名
+            # 要发送的信息
+            court_name = page_order_html.xpath('//*[@class="ddqr"]/text()')[0][6:]  # 场地名称
+            order_date = page_order_html.xpath('//*[@class="txdd_table_2"]/tr[3]/td/p/text()')[0]  # 日期 星期几
+            order_time = page_order_html.xpath('//*[@class="txdd_table_2"]/tr[3]/td/p/span/text()')[0].replace('\r\n', '').replace('\t', '')  # 时间段
+        except Exception as e:
+            print(repr(e))
+            print(page_order.text)
+            print('Exception while loading order page. Retry...')
+            return False
 
         code = self._read_captcha()
         print('验证码：', code)
