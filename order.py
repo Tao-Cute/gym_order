@@ -252,11 +252,11 @@ class Elife():
         '''
         while True:  # 验证码识别为空或者不是4个字符，则重试
             img_code = Image.open(BytesIO(self.session.get(self.url_code).content)).convert('L')
-            img_code.show()
+            # img_code.show()
 
             enh_bri = ImageEnhance.Brightness(img_code)
             img_code_enhanced = enh_bri.enhance(factor=1.5)
-            img_code_enhanced.show()
+            # img_code_enhanced.show()
 
             img_code_numpy = np.array(img_code_enhanced)
 
