@@ -165,7 +165,8 @@ class Elife():
         success_times = 0
         for i, str in enumerate(order_times):
             for j in range(2):   # 为了防止预约失败，每个时段都尝试两次
-                print("\n◉ 第{}次尝试 时段：{}".format(i+1, str))
+                current_time = datetime.datetime.now().strftime("%H:%M:%S")
+                print("\n◉ {} 第{}次尝试 时段：{}".format(current_time, i+1, str))
                 success_flag = self._order_once(url_date, str)
                 if success_flag:
                     success_times += 1
