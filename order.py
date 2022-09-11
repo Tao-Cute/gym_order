@@ -21,7 +21,7 @@ order_times = ['21:00', '20:00', '19:00', '18:00', '14:00', '10:00', '08:00']  #
 max_order_num = 2 # 每天最多预约场次数 1~3
 skip_days = 2 # 预约日期距离今天的天数 0~2
 start_time = '07:00:00' # 开始执行时间
-wait_until_start_time = False # 是否等待开始时间(for testing)
+wait_until_start_time = True # 是否等待开始时间(for testing)
 send_email = True # 预约成功是否发邮件提醒
 #**********************************************
 
