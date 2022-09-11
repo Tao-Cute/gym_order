@@ -13,7 +13,7 @@ import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 import os
 
 #*******************预约条件*******************
@@ -167,8 +167,9 @@ class Elife():
         url_court = 'https://elife.fudan.edu.cn/public/front/getResource2.htm?contentId=8aecc6ce749544fd01749a31a04332c2&ordersId=&currentDate=' # 江湾体育馆羽毛球场
         
         url_date = url_court + date
-
-        lock = multiprocessing.Manager().Lock()
+        
+        manager = Manager()
+        lock = manager.Lock()
 
         pool = Pool(2)
         params_lst = [(url_date, order_time, lock) for order_time in order_times]
