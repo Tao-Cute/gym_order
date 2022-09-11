@@ -13,16 +13,19 @@ import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
+from multiprocessing import Pool, Lock
 import os
 
 #*******************预约条件*******************
 order_times = ['21:00', '20:00', '19:00', '18:00', '14:00', '10:00', '08:00']  # 想要预约的时间段 会[按照顺序]依次尝试预约每个时间段的场次
 max_order_num = 2 # 每天最多预约场次数 1~3
 skip_days = 2 # 预约日期距离今天的天数 0~2
-start_time = '07:00:00' # 开始执行时间
+start_time = '07:00:05' # 开始执行时间
 wait_until_start_time = True # 是否等待开始时间(for testing)
 send_email = True # 预约成功是否发邮件提醒
 #**********************************************
+
+success_times = 0
 
 class Elife():
     '''
@@ -156,6 +159,7 @@ class Elife():
                     print('等待资源开放时间...')  # 10秒打印一次
 
         date = (datetime.date.today() + datetime.timedelta(days=skip_days)).strftime("%Y-%m-%d")
+        print('目标日期：{}'.format(date))
         # contentIframe url
         # url_court = 'https://elife.fudan.edu.cn/public/front/getResource2.htm?contentId=8aecc6ce749544fd01749a31a04332c2&ordersId=&currentDate=' # 江湾体育馆羽毛球场
         # url_court = 'https://elife.fudan.edu.cn/public/front/getResource2.htm?contentId=2c9c486e4f821a19014f82418a900004&ordersId=&currentDate='  # 正大体育馆羽毛球场
@@ -163,29 +167,50 @@ class Elife():
         url_court = 'https://elife.fudan.edu.cn/public/front/getResource2.htm?contentId=8aecc6ce749544fd01749a31a04332c2&ordersId=&currentDate=' # 江湾体育馆羽毛球场
         
         url_date = url_court + date
-        success_times = 0
-        for i, str in enumerate(order_times):
-            for j in range(2):   # 为了防止预约失败，每个时段都尝试两次
-                current_time = datetime.datetime.now().strftime("%H:%M:%S")
-                print("\n◉ {} 第{}次尝试 时段：{}".format(current_time, i+1, str))
-                success_flag = self._order_once(url_date, str)
-                if success_flag:
-                    success_times += 1
-                    break       # 第一次预约成功则跳过第二次，直接进入下个时段预约
-            if success_times >= max_order_num:
-                break
+
+        lock = Lock()
+
+        pool = Pool(2)
+        params_lst = [(url_date, order_time, lock) for order_time in order_times]
+        result = pool.starmap_async(self._order_once, params_lst)
+        print(result.get())
+
+        pool.close()
+        pool.join()
+
+            # for i, str in enumerate(order_times):
+            # for j in range(2):   # 为了防止预约失败，每个时段都尝试两次
+            #     current_time = datetime.datetime.now().strftime("%H:%M:%S")
+            #     print("\n◉ {} 第{}次尝试 时段：{}".format(current_time, i+1, str))
+            #     success_flag = self._order_once(url_date, str)
+            #     if success_flag:
+            #         success_times += 1
+            #         break       # 第一次预约成功则跳过第二次，直接进入下个时段预约
+            # if success_times >= max_order_num:
+            #     break
         print('\n全部预约完成！')
 
-    def _order_once(self, url, time_str):
+
+    def _order_once(self, url, time_str, lock):
         '''
-        执行一次预约
+        执行一次预约，并在一行内打印结果
+        成功返回True，失败返回False
         '''
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        message = '\n◉ {} 目标时段：{}  '.format(current_time, time_str)
+        # global success_times  # 用manager替换
+        # if success_times >= 2:
+        #     message += '已达到设置的当天最大预约次数！'
+        #     print(message, flush=True)
+        #     return False
+
         page_date = self.session.get(url)  # 要预约的当天场次选择页面
         page_date_html = etree.HTML(page_date.text)
         order_btn_list = page_date_html.xpath('//tr[td/font/text()="{}"]/td/img/@onclick'.format(time_str))
         # 是一个预约时间的按钮onclick属性list，形如["checkUser('8aecc6ce7fb5f264017fbedaf2ac7d87',this)"]，若该时间段能预约则有onclick属性，若按钮为灰则无onclick属性
         if len(order_btn_list) == 0:  # 没有onclick属性，说明该时间段不能预约
-            print('当前时段不可预约！')
+            message += '当前时段不可预约！'
+            print(message, flush=True)
             return False
 
         resource_ids = order_btn_list[0][11:-7]
@@ -216,34 +241,40 @@ class Elife():
             print('Exception while loading order page. Retry...')
             return False
 
+        lock.acquire() # 创建锁，将请求、读取验证码与约场请求绑定，以防止并行的进程同时请求验证码导致预约失败
+
         code = self._read_captcha()
-        print('验证码：', code)
+        message +='验证码：{} '.format(code)
 
         self.session.headers.update({'referer': url})
         files = {'serviceContent.id': (None, service_content_id),
-                 'serviceCategory.id':  (None, service_category_id),
-                 'contentChild': (None, ''),
-                 'codeStr': (None, code_str),
-                 'itemsPrice': (None, ''),
-                 'acceptPrice': (None, ''),
-                 'orderuser': (None, order_user),
-                 'resourceIds': (None, resource_ids),
-                 'orderCounts': (None, 1),
-                 'lastDays': (None, 0),
-                 'mobile': (None, self.mobile),
-                 'imageCodeName': (None, code),
-                 'd_cgyy.bz': (None, '')}
+                'serviceCategory.id':  (None, service_category_id),
+                'contentChild': (None, ''),
+                'codeStr': (None, code_str),
+                'itemsPrice': (None, ''),
+                'acceptPrice': (None, ''),
+                'orderuser': (None, order_user),
+                'resourceIds': (None, resource_ids),
+                'orderCounts': (None, 1),
+                'lastDays': (None, 0),
+                'mobile': (None, self.mobile),
+                'imageCodeName': (None, code),
+                'd_cgyy.bz': (None, '')}
         order_result = self.session.post('https://elife.fudan.edu.cn/public/front/saveOrder.htm?op=order', files=files, allow_redirects=True)  # 预约成功会自动重定向到操作成功页面
+        lock.release() # 释放锁
+
         if order_result.url.find('%E6%93%8D%E4%BD%9C%E6%88%90%E5%8A%9F') >= 0:  # url编码中含有“操作成功”，表示预约成功
-            print('预约成功！')
+            message += '预约成功！'
             if send_email:
                 mail = Mail(court_name, order_date, order_time, order_user)
                 mail.send()
+            print(message, flush=True)
             return True
         else:
-            print('预约失败！')
-            print('URL:', order_result.url)
-            # print(order_result.text)
+            message += '预约失败！'
+            # message += 'URL:{}'.format(order_result.url)
+            print(order_result.text, flush=True)
+            print(message, flush=True)
             return False
 
     def _read_captcha(self):
@@ -296,9 +327,10 @@ class Mail:
             smtpObj.login(self.sender, self.mail_pass)
             smtpObj.sendmail(self.sender, self.receivers, message.as_string())
             smtpObj.quit()
-            print('邮件已发送!')
+            # print('邮件已发送!')
         except smtplib.SMTPException as e:
-            print('邮件发送失败!')
+            pass
+            # print('邮件发送失败!')
 
 
 def get_account():
