@@ -13,7 +13,7 @@ import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
-from multiprocessing import Pool, Lock
+from multiprocessing import Pool
 import os
 
 #*******************预约条件*******************
@@ -168,7 +168,7 @@ class Elife():
         
         url_date = url_court + date
 
-        lock = Lock()
+        lock = multiprocessing.Manager().Lock()
 
         pool = Pool(2)
         params_lst = [(url_date, order_time, lock) for order_time in order_times]
