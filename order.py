@@ -170,6 +170,8 @@ class Elife():
 
         pool = Pool(2)
         params_lst = [(url_date, time_str, lock, success_times) for time_str in order_times]
+        
+        self._read_captcha() # 识别一次验证码，为了提前下载模型
 
         # 等待开放时间
         if wait_until_start_time:
