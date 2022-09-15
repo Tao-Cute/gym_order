@@ -180,7 +180,7 @@ class Elife():
                 time.sleep(0.5)
                 cnt += 1
                 if cnt % 20 == 0:
-                    print('等待资源开放时间...')  # 10秒打印一次
+                    print('等待资源开放时间...', flush=True)  # 10秒打印一次
 
         if n_avail == 1: # 只有1个位置时顺序约，防止没有按照想要的顺序
             result_lst = []
